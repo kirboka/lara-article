@@ -2,19 +2,34 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\Like\UpdateRequest;
+use App\Http\Resources\ArticleResource;
 use App\Models\Article;
-use Illuminate\Support\Facades\Redis;
 
+/**
+ * Class LikeController
+ * @package App\Http\Controllers
+ */
 class LikeController extends Controller
 {
-    public function update()
+    /**
+     * @param UpdateRequest $request
+     * @return ArticleResource
+     */
+    public function update(UpdateRequest $request)
     {
-        $article = request('article');
-        $like = Redis::get('article:like:'.$article);
-        if (empty($like)) {
-            $like = Article::find($article)->first()->likes;
+        $article = new Article();
+        $article->id = $request->input('article');
+        $realtime_likes = $article->getRealtimeLikes();
+        if (!$realtime_likes) {
+            $articleStatic = Article::find($article->id);
+            if ($articleStatic) {
+                $article->realtime_likes = $articleStatic->first()->likes;
+            } else {
+                abort(404);
+            }
         }
-        Redis::set('article:like:'.$article, ++$like);
-        return response()->json(['likes' => $like, 'article' => $article]);
+        $article->realtime_likes = ++$realtime_likes;
+        return new ArticleResource($article);
     }
 }
